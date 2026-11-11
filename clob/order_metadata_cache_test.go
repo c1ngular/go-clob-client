@@ -321,3 +321,49 @@ func TestCreateOrderRefreshesStaleTickMetadata(t *testing.T) {
 		t.Fatalf("tick-size requests = %d, want 0", tickCalls.Load())
 	}
 }
+
+func TestWarmOrderMetadataPopulatesCacheWithoutRefetch(t *testing.T) {
+	var conditionCalls atomic.Int32
+	var marketCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case marketsByTokenEndpoint + "yes":
+			conditionCalls.Add(1)
+			_, _ = w.Write([]byte(`{"condition_id":"cid"}`))
+		case clobMarketEndpoint + "/cid":
+			marketCalls.Add(1)
+			_, _ = w.Write([]byte(`{"c":"cid","mts":"0.01","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"yes"},{"t":"no"}]}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewClient(Config{Host: server.URL, RetryMax: 0})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	if err := client.WarmOrderMetadata(t.Context(), " yes "); err != nil {
+		t.Fatalf("WarmOrderMetadata: %v", err)
+	}
+	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 {
+		t.Fatalf("warm calls: condition=%d market=%d, want 1/1", conditionCalls.Load(), marketCalls.Load())
+	}
+
+	value, err := client.resolveOrderMarketMetadata(t.Context(), "yes", false)
+	if err != nil {
+		t.Fatalf("resolve after warm: %v", err)
+	}
+	if value.TickSize != TickSizeHundredth || !value.NegRisk || value.FeeInfo.Exponent != 1 {
+		t.Fatalf("metadata = %+v", value)
+	}
+	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 {
+		t.Fatalf("cache hit refetched: condition=%d market=%d", conditionCalls.Load(), marketCalls.Load())
+	}
+
+	if err := client.WarmOrderMetadata(t.Context(), " "); err == nil {
+		t.Fatal("blank position id accepted")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -143,6 +144,28 @@ func (c *Client) resolveOrderMarketMetadata(
 	close(load.done)
 	c.orderMetadataMu.Unlock()
 	return value, err
+}
+
+// WarmOrderMetadata resolves and caches the order metadata for one position
+// ID without signing or posting an order. It performs the same condition and
+// market reads as the first CreateOrder for that market; a later order with no
+// explicit options finds the cache warm and goes straight to signing.
+//
+// It is a cache prefill, not a preflight: no wallet, balance, allowance, or
+// venue state is consulted, and a failed warm leaves the normal lazy
+// resolution in place.
+func (c *Client) WarmOrderMetadata(ctx context.Context, positionID string) error {
+	if c == nil {
+		return errors.New("clob: warm order metadata: client unavailable")
+	}
+	positionID = strings.TrimSpace(positionID)
+	if positionID == "" {
+		return errors.New("clob: warm order metadata: position id is required")
+	}
+	if _, err := c.resolveOrderMarketMetadata(ctx, positionID, false); err != nil {
+		return fmt.Errorf("clob: warm order metadata %s: %w", positionID, err)
+	}
+	return nil
 }
 
 func (c *Client) resolveOrderCondition(
