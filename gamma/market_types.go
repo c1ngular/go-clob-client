@@ -199,6 +199,11 @@ type Market struct {
 	InternalUsers            []InternalUser  `json:"internalUsers,omitzero"`
 	FeeType                  *string         `json:"feeType,omitzero"`
 	FeeSchedule              *FeeSchedule    `json:"feeSchedule,omitzero"`
+	// Raw is the exact JSON object the venue returned. UnmarshalJSON captures
+	// it; marshaling ignores it so the modeled fields remain the canonical wire
+	// shape. Consumers that must retain venue evidence (a market tape or audit
+	// log) read it instead of issuing a second request.
+	Raw json.RawMessage `json:"-"`
 }
 
 // ClobReward represents CLOB rewards configuration for a market.

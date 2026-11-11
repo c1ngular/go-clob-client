@@ -57,6 +57,10 @@ func (m *Market) UnmarshalJSON(data []byte) error {
 		value.SubmittedBy = wire.SubmittedByLegacy
 	}
 	*m = Market(value)
+	// Preserve the venue's exact object, including fields this model does not
+	// know about. The copy matters: callers must not retain the decoder's
+	// scratch buffer.
+	m.Raw = append(json.RawMessage(nil), data...)
 	return nil
 }
 
