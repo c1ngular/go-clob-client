@@ -72,10 +72,13 @@ type DeleteReadonlyAPIKeyRequest struct {
 type AssetType string
 
 const (
-	// AssetTypeCollateral is the USDC collateral asset namespace.
+	// AssetTypeCollateral is the pUSD collateral asset namespace.
 	AssetTypeCollateral AssetType = "COLLATERAL"
-	// AssetTypeConditional is the conditional token asset namespace.
+	// AssetTypeConditional is the CTF conditional-token asset namespace.
 	AssetTypeConditional AssetType = "CONDITIONAL"
+	// AssetTypeConditionalV2 is the Protocol V2 position namespace. Use it with
+	// a V2 position ID; CONDITIONAL remains the CTF token namespace.
+	AssetTypeConditionalV2 AssetType = "CONDITIONAL-V2"
 )
 
 // BalanceAllowanceParams configures a balance or allowance lookup.

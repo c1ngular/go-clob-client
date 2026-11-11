@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// DefaultHost is the production Polymarket CLOB base URL.
-	DefaultHost = "https://clob-v2.polymarket.com"
+	// DefaultHost is the documented production Polymarket CLOB base URL.
+	DefaultHost = "https://clob.polymarket.com"
 	// DefaultRTDSHost is the production Polymarket RTDS WebSocket URL.
 	DefaultRTDSHost = "wss://ws-live-data.polymarket.com"
 	// DefaultGeoblockHost is the production Polymarket site host for geoblock checks.
