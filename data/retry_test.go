@@ -25,6 +25,9 @@ func TestReadRetryPolicy(t *testing.T) {
 		{"past date", "Thu, 10 Sep 2026 06:00:00 GMT", `{}`, 429, 3},
 		{"future date", "Thu, 10 Sep 2026 06:00:06 GMT", `{}`, 429, 1},
 		{"server error", "0", `{"error":"unavailable"}`, 503, 1},
+		{"retryable server error", "0", `{"error":"unavailable","retryable":true}`, 503, 3},
+		{"nonretryable server error", "0", `{"error":"unavailable","retryable":false}`, 503, 1},
+		{"retryable client error", "0", `{"error":"invalid","retryable":true}`, 400, 1},
 		{"client error", "0", `{"error":"invalid"}`, 400, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

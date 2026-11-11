@@ -11,8 +11,10 @@ import (
 )
 
 // getReadJSON retries only the Data API's indexed JSON reads. Accounting
-// downloads and other services deliberately do not use this policy. The budget
-// belongs to one request (one page), never to an entire cursor traversal.
+// downloads and other services deliberately do not use this policy. A 429 is
+// always retryable; a 5xx is retried only when the v2 error envelope says so.
+// The budget belongs to one request (one page), never to an entire cursor
+// traversal.
 func (c *Client) getReadJSON(ctx context.Context, path string, q url.Values, out any) error {
 	for attempt := 0; ; attempt++ {
 		if err := ctx.Err(); err != nil {
@@ -20,8 +22,7 @@ func (c *Client) getReadJSON(ctx context.Context, path string, q url.Values, out
 		}
 		err := c.http.GetJSON(ctx, path, q, polyhttp.AuthNone, out)
 		var apiErr *APIError
-		if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusTooManyRequests ||
-			attempt >= 2 {
+		if !errors.As(err, &apiErr) || !retryableRead(apiErr) || attempt >= 2 {
 			return err
 		}
 		delay := 1.0
@@ -41,4 +42,15 @@ func (c *Client) getReadJSON(ctx context.Context, path string, q url.Values, out
 		case <-timer.C:
 		}
 	}
+}
+
+// retryableRead reports whether one failed read may be retried unchanged. A
+// 429 is inherently retryable; a 5xx is retried only when the service's v2
+// envelope marks it so. A 4xx is never retried, even if a malformed body says
+// otherwise.
+func retryableRead(err *APIError) bool {
+	if err.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	return err.StatusCode >= 500 && err.Retryable != nil && *err.Retryable
 }

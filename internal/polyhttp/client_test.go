@@ -102,6 +102,46 @@ func TestAPIErrorRetryAfterHeader(t *testing.T) {
 	}
 }
 
+func TestAPIErrorRetryableClassification(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		body    string
+		present bool
+		want    bool
+	}{
+		{"retryable", `{"error":"unavailable","retryable":true}`, true, true},
+		{"not retryable", `{"error":"invalid","retryable":false}`, true, false},
+		{"absent", `{"error":"unavailable"}`, false, false},
+		{"malformed", `{"error":"unavailable","retryable":"yes"}`, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+
+			client := &Client{BaseURL: server.URL, HTTPClient: server.Client(), UserAgent: "test"}
+			err := client.GetJSON(context.Background(), "/", nil, AuthNone, nil)
+			apiErr, ok := err.(*APIError)
+			if !ok {
+				t.Fatalf("expected APIError, got %T (%v)", err, err)
+			}
+			if !tc.present {
+				if apiErr.Retryable != nil {
+					t.Fatalf("Retryable = %v, want nil", *apiErr.Retryable)
+				}
+				return
+			}
+			if apiErr.Retryable == nil || *apiErr.Retryable != tc.want {
+				t.Fatalf("Retryable = %v, want %v", apiErr.Retryable, tc.want)
+			}
+		})
+	}
+}
+
 func TestAPIErrorRetryAfterBodyFallback(t *testing.T) {
 	t.Parallel()
 

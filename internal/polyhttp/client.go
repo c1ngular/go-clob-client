@@ -92,6 +92,10 @@ type APIError struct {
 	// Code is the machine-readable error code from the response body, when
 	// present. It is nil when the response does not provide one.
 	Code *string
+	// Retryable is the service's explicit retry classification from the v2
+	// error envelope. Nil means the body did not carry the field; callers must
+	// not infer it from the status code alone.
+	Retryable *bool
 	// TradingRestriction identifies the trading restriction that caused the
 	// rejection. It is nil when the rejection is not a trading restriction.
 	TradingRestriction *TradingRestriction
@@ -478,22 +482,26 @@ func newAPIError(resp *http.Response, body, requestBody []byte) *APIError {
 	err.Code = extractResponseErrorCode(body)
 
 	var payload struct {
-		Error any `json:"error"`
+		Error     any                `json:"error"`
+		Retryable stdjson.RawMessage `json:"retryable"`
 	}
-	if json.Unmarshal(body, &payload) == nil && payload.Error != nil {
-		switch e := payload.Error.(type) {
-		case string:
-			err.Message = e
-		case map[string]any:
-			if msg, ok := e["message"].(string); ok {
-				err.Message = msg
-			} else {
+	if json.Unmarshal(body, &payload) == nil {
+		err.Retryable = parseRetryable(payload.Retryable)
+		if payload.Error != nil {
+			switch e := payload.Error.(type) {
+			case string:
+				err.Message = e
+			case map[string]any:
+				if msg, ok := e["message"].(string); ok {
+					err.Message = msg
+				} else {
+					err.Message = fmt.Sprint(e)
+				}
+			default:
 				err.Message = fmt.Sprint(e)
 			}
-		default:
-			err.Message = fmt.Sprint(e)
+			return err
 		}
-		return err
 	}
 
 	if len(body) > 0 {
@@ -501,6 +509,22 @@ func newAPIError(resp *http.Response, body, requestBody []byte) *APIError {
 	}
 
 	return err
+}
+
+// parseRetryable reads the v2 error envelope's explicit boolean. A malformed
+// or absent value stays nil; the field is the service's classification, not
+// something the client should guess.
+func parseRetryable(raw stdjson.RawMessage) *bool {
+	switch strings.TrimSpace(string(raw)) {
+	case "true":
+		value := true
+		return &value
+	case "false":
+		value := false
+		return &value
+	default:
+		return nil
+	}
 }
 
 // retryAfterSeconds extracts a finite, non-negative retry delay. A valid
