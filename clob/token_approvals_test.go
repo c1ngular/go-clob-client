@@ -90,6 +90,137 @@ func TestRequiredTradingApprovalsMatchesOfficialContractSet(t *testing.T) {
 	}
 }
 
+func TestRequiredTradingApprovalsV2Scope(t *testing.T) {
+	t.Parallel()
+
+	config, err := getContractConfig(PolygonChainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	erc20, erc1155, err := requiredTradingApprovals(
+		PolygonChainID,
+		config,
+		TradingApprovalScopeV2,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(erc20) != 2 || len(erc1155) != 2 {
+		t.Fatalf(
+			"V2 approval requirements = %d ERC20, %d ERC1155; want 2, 2",
+			len(erc20),
+			len(erc1155),
+		)
+	}
+	wantERC20Spenders := []string{config.ProtocolV2Router, config.ExchangeV3}
+	for i, want := range wantERC20Spenders {
+		got := erc20[i]
+		if got.TokenAddress != common.HexToAddress(config.Collateral) ||
+			got.SpenderAddress != common.HexToAddress(want) ||
+			got.Amount.Cmp(MaxUint256()) != 0 {
+			t.Fatalf(
+				"V2 ERC20 approval[%d] = token %s spender %s amount %s; want pUSD %s max",
+				i,
+				got.TokenAddress,
+				got.SpenderAddress,
+				got.Amount,
+				want,
+			)
+		}
+	}
+	wantERC1155 := [][2]string{
+		{config.PositionManager, config.ProtocolV2Router},
+		{config.PositionManager, config.ExchangeV3},
+	}
+	for i, want := range wantERC1155 {
+		got := erc1155[i]
+		if got.TokenAddress != common.HexToAddress(want[0]) ||
+			got.OperatorAddress != common.HexToAddress(want[1]) ||
+			!got.Approved {
+			t.Fatalf(
+				"V2 ERC1155 approval[%d] = token %s operator %s approved %v; want %s %s true",
+				i,
+				got.TokenAddress,
+				got.OperatorAddress,
+				got.Approved,
+				want[0],
+				want[1],
+			)
+		}
+	}
+
+	if _, _, err := requiredTradingApprovals(
+		PolygonChainID,
+		config,
+		TradingApprovalScope("v3"),
+	); err == nil || !strings.Contains(err.Error(), "unknown scope") {
+		t.Fatalf("unknown scope error = %v", err)
+	}
+	all, _, err := requiredTradingApprovals(
+		PolygonChainID,
+		config,
+		TradingApprovalScopeAll,
+		TradingApprovalScopeV2,
+	)
+	if err != nil || len(all) != 7 {
+		t.Fatalf("explicit all scope = %d approvals, %v; want the full catalog", len(all), err)
+	}
+}
+
+func TestPrepareTradingApprovalsV2ReadsOnlyV2Targets(t *testing.T) {
+	t.Parallel()
+
+	rpc, calls := newTokenReadRPC(t, MaxUint256(), true)
+	client, err := NewSignerClient(Config{
+		ChainID:    PolygonChainID,
+		PrivateKey: gaslessTestKey,
+		RPCURL:     rpc.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := client.PrepareTradingApprovals(t.Context(), TradingApprovalScopeV2)
+	if err != nil {
+		t.Fatalf("PrepareTradingApprovals(V2): %v", err)
+	}
+	if !plan.Empty() {
+		t.Fatalf("V2 plan = %+v, want empty", plan)
+	}
+	if got := calls.Load(); got != 4 {
+		t.Fatalf("eth_call count = %d, want 4 (two ERC20 + two ERC1155)", got)
+	}
+}
+
+func TestPrepareTradingApprovalsV2ReturnsMissingState(t *testing.T) {
+	t.Parallel()
+
+	rpc, calls := newTokenReadRPC(t, big.NewInt(0), false)
+	client, err := NewSignerClient(Config{
+		ChainID:    PolygonChainID,
+		PrivateKey: gaslessTestKey,
+		RPCURL:     rpc.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := client.PrepareTradingApprovals(t.Context(), TradingApprovalScopeV2)
+	if err != nil {
+		t.Fatalf("PrepareTradingApprovals(V2): %v", err)
+	}
+	if len(plan.ERC20Approvals) != 2 || len(plan.ERC1155Approvals) != 2 {
+		t.Fatalf(
+			"V2 plan = %d ERC20, %d ERC1155; want 2, 2",
+			len(plan.ERC20Approvals),
+			len(plan.ERC1155Approvals),
+		)
+	}
+	if got := calls.Load(); got != 4 {
+		t.Fatalf("eth_call count = %d, want 4", got)
+	}
+}
+
 func TestPrepareTradingApprovalsSkipsSatisfiedState(t *testing.T) {
 	t.Parallel()
 

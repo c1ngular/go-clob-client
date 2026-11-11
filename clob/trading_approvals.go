@@ -17,6 +17,45 @@ type Erc20TradingApproval = ERC20ApprovalRequest
 // SDK's existing ERC1155ApprovalForAllRequest is the same shape.
 type Erc1155TradingApproval = ERC1155ApprovalForAllRequest
 
+// TradingApprovalScope selects the protocol family whose approvals are read or
+// granted. Passing no scope covers every official target, preserving the
+// behavior of callers that predate Protocol V2.
+type TradingApprovalScope string
+
+const (
+	// TradingApprovalScopeAll covers every approval the SDK knows.
+	TradingApprovalScopeAll TradingApprovalScope = "all"
+	// TradingApprovalScopeV2 covers Protocol V2 trading and settlement only:
+	// pUSD allowances and PositionManager operator approvals for ExchangeV3 and
+	// the V2 Router. It deliberately excludes the CTF exchanges, collateral
+	// adapters, auto-redeem operator, and perps deposit contract.
+	TradingApprovalScopeV2 TradingApprovalScope = "v2"
+)
+
+// v2OnlyTradingApprovals resolves optional scopes. No scope means the full
+// catalog; an explicit All dominates; an unknown scope is an error rather than
+// a silent widening or narrowing of the grant.
+func v2OnlyTradingApprovals(scopes []TradingApprovalScope) (bool, error) {
+	if len(scopes) == 0 {
+		return false, nil
+	}
+	all, v2 := false, false
+	for _, scope := range scopes {
+		switch scope {
+		case "", TradingApprovalScopeAll:
+			all = true
+		case TradingApprovalScopeV2:
+			v2 = true
+		default:
+			return false, fmt.Errorf("trading approvals: unknown scope %q", scope)
+		}
+	}
+	if all {
+		return false, nil
+	}
+	return v2, nil
+}
+
 // MissingTradingApprovals is the set of trading approvals a wallet still needs
 // to grant before it can trade through the official contract set.
 type MissingTradingApprovals struct {
@@ -68,16 +107,18 @@ func buildMissingTradingApprovalCalls(
 // GetTradingApprovalsState reads the configured wallet's current on-chain
 // approval state and returns a snapshot of what is missing. It does not
 // submit any transactions. The wallet defaults to the configured funder
-// address; pass an explicit wallet to inspect a different owner.
+// address; pass an explicit wallet to inspect a different owner. Pass
+// TradingApprovalScopeV2 to read solely the native Protocol V2 pairs.
 func (c *SignerClient) GetTradingApprovalsState(
 	ctx context.Context,
 	wallet string,
+	scopes ...TradingApprovalScope,
 ) (*TradingApprovalsState, error) {
 	config, err := getContractConfig(c.chainID)
 	if err != nil {
 		return nil, err
 	}
-	erc20, erc1155, err := requiredTradingApprovals(c.chainID, config)
+	erc20, erc1155, err := requiredTradingApprovals(c.chainID, config, scopes...)
 	if err != nil {
 		return nil, err
 	}

@@ -118,6 +118,76 @@ func TestIndexedTradingApprovalsContract(t *testing.T) {
 	}
 }
 
+func TestIndexedTradingApprovalsV2Scope(t *testing.T) {
+	t.Parallel()
+
+	wallet := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	config, err := getContractConfig(PolygonChainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	erc20, erc1155, err := requiredTradingApprovals(
+		PolygonChainID,
+		config,
+		TradingApprovalScopeV2,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := make([]indexedApprovalRow, 0, len(erc20)+len(erc1155))
+	for _, approval := range erc20 {
+		rows = append(rows, indexedApprovalRow{
+			Token:    approval.TokenAddress.Hex(),
+			Spender:  approval.SpenderAddress.Hex(),
+			Standard: "ERC20",
+			Amount:   json.RawMessage(`"max"`),
+			Approved: json.RawMessage(`true`),
+		})
+	}
+	for _, approval := range erc1155 {
+		rows = append(rows, indexedApprovalRow{
+			Token:    approval.TokenAddress.Hex(),
+			Spender:  approval.OperatorAddress.Hex(),
+			Standard: "ERC1155",
+			Approved: json.RawMessage(`true`),
+		})
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v2/approvals" || r.URL.Query().Get("user") != wallet.Hex() {
+			t.Errorf("wrong approval query: %s", r.URL)
+		}
+		encoded, err := json.Marshal(rows)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		fmt.Fprintf(
+			w,
+			`{"data":{"address":%q,"chain_id":%d,"contracts":%s}}`,
+			wallet.Hex(),
+			PolygonChainID,
+			encoded,
+		)
+	}))
+	t.Cleanup(server.Close)
+	reader, err := NewTradingApprovalsReader(
+		TradingApprovalsReaderConfig{DataHost: server.URL},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := reader.FetchTradingApprovalsState(t.Context(), wallet, TradingApprovalScopeV2)
+	if err != nil || !state.IsFullyApproved {
+		t.Fatalf("V2 snapshot: %+v %v", state, err)
+	}
+	rows[0].Approved = json.RawMessage(`false`)
+	state, err = reader.FetchTradingApprovalsState(t.Context(), wallet, TradingApprovalScopeV2)
+	if err != nil || state.IsFullyApproved || len(state.Missing.ERC20Approvals) != 1 {
+		t.Fatalf("V2 revoked snapshot: %+v %v", state, err)
+	}
+}
+
 func TestEOATradingApprovalsReadSigner(t *testing.T) {
 	t.Parallel()
 	client := newGaslessClient(t, SignatureTypeEOA, "http://127.0.0.1:1")

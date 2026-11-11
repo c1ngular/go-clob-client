@@ -56,10 +56,12 @@ type indexedApprovalRow struct {
 
 // FetchTradingApprovalsState validates the account, chain and every required
 // row. Unrelated catalog rows are ignored; duplicate/missing required rows and
-// malformed finite allowances never silently appear approved.
+// malformed finite allowances never silently appear approved. Pass
+// TradingApprovalScopeV2 to validate solely the native Protocol V2 pairs.
 func (r *TradingApprovalsReader) FetchTradingApprovalsState(
 	ctx context.Context,
 	wallet common.Address,
+	scopes ...TradingApprovalScope,
 ) (*TradingApprovalsState, error) {
 	if wallet == (common.Address{}) {
 		return nil, fmt.Errorf("approvals: zero wallet")
@@ -84,7 +86,7 @@ func (r *TradingApprovalsReader) FetchTradingApprovalsState(
 	if err != nil {
 		return nil, err
 	}
-	erc20, erc1155, err := requiredTradingApprovals(r.chainID, cfg)
+	erc20, erc1155, err := requiredTradingApprovals(r.chainID, cfg, scopes...)
 	if err != nil {
 		return nil, err
 	}

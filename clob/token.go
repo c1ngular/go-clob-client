@@ -195,10 +195,18 @@ func tradingApprovalAddress(chainID int64, name, value string) (common.Address, 
 	return address, nil
 }
 
+// requiredTradingApprovals returns the approval pairs a wallet needs. With no
+// scope it returns the full official catalog; TradingApprovalScopeV2 narrows
+// it to the native Protocol V2 pairs.
 func requiredTradingApprovals(
 	chainID int64,
 	config contractConfig,
+	scopes ...TradingApprovalScope,
 ) ([]ERC20ApprovalRequest, []ERC1155ApprovalForAllRequest, error) {
+	v2Only, err := v2OnlyTradingApprovals(scopes)
+	if err != nil {
+		return nil, nil, err
+	}
 	resolve := func(name, value string) (common.Address, error) {
 		return tradingApprovalAddress(chainID, name, value)
 	}
@@ -270,15 +278,31 @@ func requiredTradingApprovals(
 		{TokenAddress: positionManager, OperatorAddress: exchangeV3, Approved: true},
 		{TokenAddress: positionManager, OperatorAddress: autoRedeemOperator, Approved: true},
 	}
+	if v2Only {
+		// Protocol V2 uses pUSD for collateral and PositionManager for
+		// positions. ExchangeV3 is the order verifier; the Router performs
+		// split, merge, and redeem. The CTF and perps targets do not belong to
+		// this wallet model.
+		erc20 = []ERC20ApprovalRequest{
+			{TokenAddress: collateral, SpenderAddress: protocolV2Router, Amount: MaxUint256()},
+			{TokenAddress: collateral, SpenderAddress: exchangeV3, Amount: MaxUint256()},
+		}
+		erc1155 = []ERC1155ApprovalForAllRequest{
+			{TokenAddress: positionManager, OperatorAddress: protocolV2Router, Approved: true},
+			{TokenAddress: positionManager, OperatorAddress: exchangeV3, Approved: true},
+		}
+	}
 	return erc20, erc1155, nil
 }
 
 // PrepareTradingApprovals reads the configured wallet's current on-chain
-// allowances and returns only the missing official trading approvals.
+// allowances and returns only the missing official trading approvals. Pass
+// TradingApprovalScopeV2 to read solely the native Protocol V2 pairs.
 func (c *SignerClient) PrepareTradingApprovals(
 	ctx context.Context,
+	scopes ...TradingApprovalScope,
 ) (*MissingTradingApprovals, error) {
-	state, err := c.GetTradingApprovalsState(ctx, "")
+	state, err := c.GetTradingApprovalsState(ctx, "", scopes...)
 	if err != nil {
 		return nil, err
 	}
@@ -289,11 +313,14 @@ func (c *SignerClient) PrepareTradingApprovals(
 // an EOA. The returned receipts may contain a completed prefix when a later
 // transaction fails. For proxy, Safe, and deposit wallets use the explicit
 // SetupTradingApprovalsGasless method.
-func (c *SignerClient) SetupTradingApprovals(ctx context.Context) ([]TxReceipt, error) {
+func (c *SignerClient) SetupTradingApprovals(
+	ctx context.Context,
+	scopes ...TradingApprovalScope,
+) ([]TxReceipt, error) {
 	if err := c.requireEOATokenOperation(); err != nil {
 		return nil, err
 	}
-	plan, err := c.PrepareTradingApprovals(ctx)
+	plan, err := c.PrepareTradingApprovals(ctx, scopes...)
 	if err != nil {
 		return nil, err
 	}
@@ -329,11 +356,12 @@ func (c *SignerClient) SetupTradingApprovals(ctx context.Context) ([]TxReceipt, 
 func (c *SignerClient) SetupTradingApprovalsGasless(
 	ctx context.Context,
 	metadata string,
+	scopes ...TradingApprovalScope,
 ) (*GaslessTransactionHandle, error) {
 	if _, err := c.gaslessConfig(); err != nil {
 		return nil, err
 	}
-	plan, err := c.PrepareTradingApprovals(ctx)
+	plan, err := c.PrepareTradingApprovals(ctx, scopes...)
 	if err != nil {
 		return nil, err
 	}
