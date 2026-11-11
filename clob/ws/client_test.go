@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -845,6 +846,138 @@ func TestMarketSubscriptionsRefcountAndCustomFeatureFlag(t *testing.T) {
 	}
 	if got := messageStrings(msg["assets_ids"]); len(got) != 1 || got[0] != "asset-1" {
 		t.Fatalf("assets_ids = %#v, want [asset-1]", got)
+	}
+}
+
+// TestMarketChannelUnsubscribesReleaseRefs covers the market-channel variants
+// that previously had Subscribe methods but no matching unsubscribe. Each ref
+// must be releasable and must send the wire unsubscribe when its last ref goes
+// away; otherwise a long-running client accumulates assets and replays them on
+// reconnect.
+func TestMarketChannelUnsubscribesReleaseRefs(t *testing.T) {
+	t.Parallel()
+
+	server, messages := newSubscriptionTestServer(t)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	client := NewClient(wsURL)
+	if err := client.Connect(t.Context()); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer client.Close()
+
+	subscriptions := []struct {
+		name          string
+		id            string
+		customFeature bool
+		sub           func(context.Context, []string) error
+		unsub         func(context.Context, []string) error
+	}{
+		{"last trade", "ltp", false, client.SubscribeLastTradePrice, client.UnsubscribeLastTradePrice},
+		{"best bid ask", "bba", true, client.SubscribeBestBidAsk, client.UnsubscribeBestBidAsk},
+		{"new markets", "new", true, client.SubscribeNewMarkets, client.UnsubscribeNewMarkets},
+		{"resolutions", "res", true, client.SubscribeMarketResolutions, client.UnsubscribeMarketResolutions},
+	}
+	for _, s := range subscriptions {
+		if err := s.sub(t.Context(), []string{s.id}); err != nil {
+			t.Fatalf("subscribe %s: %v", s.name, err)
+		}
+		msg := mustReceiveSubscriptionMessage(t, messages)
+		if got := msg["type"]; got != "market" {
+			t.Fatalf("%s type = %v, want market", s.name, got)
+		}
+		if got := msg["operation"]; got != "subscribe" {
+			t.Fatalf("%s operation = %v, want subscribe", s.name, got)
+		}
+		if got := messageStrings(msg["assets_ids"]); len(got) != 1 || got[0] != s.id {
+			t.Fatalf("%s assets_ids = %#v, want [%s]", s.name, got, s.id)
+		}
+		if s.customFeature {
+			if got := msg["custom_feature_enabled"]; got != true {
+				t.Fatalf("%s custom_feature_enabled = %v, want true", s.name, got)
+			}
+		}
+	}
+	if got := client.SubscriptionCount(); got != len(subscriptions) {
+		t.Fatalf("count after subscribes = %d, want %d", got, len(subscriptions))
+	}
+	for _, s := range subscriptions {
+		if err := s.unsub(t.Context(), []string{s.id}); err != nil {
+			t.Fatalf("unsubscribe %s: %v", s.name, err)
+		}
+		msg := mustReceiveSubscriptionMessage(t, messages)
+		if got := msg["operation"]; got != "unsubscribe" {
+			t.Fatalf("%s operation = %v, want unsubscribe", s.name, got)
+		}
+		if got := messageStrings(msg["assets_ids"]); len(got) != 1 || got[0] != s.id {
+			t.Fatalf("%s assets_ids = %#v, want [%s]", s.name, got, s.id)
+		}
+	}
+	if got := client.SubscriptionCount(); got != 0 {
+		t.Fatalf("count after unsubscribes = %d, want 0", got)
+	}
+}
+
+// TestMarketChannelUnsubscribeRefcount keeps the shared-asset case honest: two
+// channels on one asset must not send an unsubscribe until the second ref is
+// released, which is the exact pattern the bot uses for orderbook +
+// resolutions.
+func TestMarketChannelUnsubscribeRefcount(t *testing.T) {
+	t.Parallel()
+
+	server, messages := newSubscriptionTestServer(t)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	client := NewClient(wsURL)
+	if err := client.Connect(t.Context()); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer client.Close()
+
+	ids := []string{"shared"}
+	if err := client.SubscribeLastTradePrice(t.Context(), ids); err != nil {
+		t.Fatalf("subscribe last trade: %v", err)
+	}
+	_ = mustReceiveSubscriptionMessage(t, messages)
+
+	if err := client.SubscribeMarketResolutions(t.Context(), ids); err != nil {
+		t.Fatalf("subscribe resolutions: %v", err)
+	}
+	// Enabling the custom-feature gate re-sends the market subscription frame;
+	// the asset ref is shared, not a second subscription.
+	msg := mustReceiveSubscriptionMessage(t, messages)
+	if got := msg["operation"]; got != "subscribe" {
+		t.Fatalf("custom-feature update operation = %v, want subscribe", got)
+	}
+	if got := msg["custom_feature_enabled"]; got != true {
+		t.Fatalf("custom-feature update flag = %v, want true", got)
+	}
+	if got := client.SubscriptionCount(); got != 2 {
+		t.Fatalf("count = %d, want 2", got)
+	}
+
+	if err := client.UnsubscribeLastTradePrice(t.Context(), ids); err != nil {
+		t.Fatalf("unsubscribe last trade: %v", err)
+	}
+	assertNoSubscriptionMessage(t, messages)
+	if got := client.SubscriptionCount(); got != 1 {
+		t.Fatalf("count after first unsubscribe = %d, want 1", got)
+	}
+
+	if err := client.UnsubscribeMarketResolutions(t.Context(), ids); err != nil {
+		t.Fatalf("unsubscribe resolutions: %v", err)
+	}
+	msg = mustReceiveSubscriptionMessage(t, messages)
+	if got := msg["operation"]; got != "unsubscribe" {
+		t.Fatalf("operation = %v, want unsubscribe", got)
+	}
+	if got := messageStrings(msg["assets_ids"]); len(got) != 1 || got[0] != "shared" {
+		t.Fatalf("assets_ids = %#v, want [shared]", got)
+	}
+	if got := client.SubscriptionCount(); got != 0 {
+		t.Fatalf("count after second unsubscribe = %d, want 0", got)
 	}
 }
 

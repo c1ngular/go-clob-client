@@ -278,6 +278,11 @@ func (c *Client) SubscribeLastTradePrice(ctx context.Context, assetIDs []string)
 	)
 }
 
+// UnsubscribeLastTradePrice unsubscribes from last trade price events for the given asset IDs.
+func (c *Client) UnsubscribeLastTradePrice(ctx context.Context, assetIDs []string) error {
+	return c.removeAndSend(ctx, channelTypeLastTradePrice, assetIDs)
+}
+
 // SubscribePrices subscribes to price change (incremental order book) events for the given asset IDs.
 func (c *Client) SubscribePrices(ctx context.Context, assetIDs []string) error {
 	return c.addAndSend(ctx, newMarketSubscription(channelTypePrices, assetIDs, false, false))
@@ -316,14 +321,29 @@ func (c *Client) SubscribeBestBidAsk(ctx context.Context, assetIDs []string) err
 	return c.addAndSend(ctx, newMarketSubscription(channelTypeBestBidAsk, assetIDs, false, true))
 }
 
+// UnsubscribeBestBidAsk unsubscribes from best bid/ask events for the given asset IDs.
+func (c *Client) UnsubscribeBestBidAsk(ctx context.Context, assetIDs []string) error {
+	return c.removeAndSend(ctx, channelTypeBestBidAsk, assetIDs)
+}
+
 // SubscribeNewMarkets subscribes to new market creation events.
 func (c *Client) SubscribeNewMarkets(ctx context.Context, assetIDs []string) error {
 	return c.addAndSend(ctx, newMarketSubscription(channelTypeNewMarkets, assetIDs, false, true))
 }
 
+// UnsubscribeNewMarkets unsubscribes from new market creation events for the given asset IDs.
+func (c *Client) UnsubscribeNewMarkets(ctx context.Context, assetIDs []string) error {
+	return c.removeAndSend(ctx, channelTypeNewMarkets, assetIDs)
+}
+
 // SubscribeMarketResolutions subscribes to market resolution events.
 func (c *Client) SubscribeMarketResolutions(ctx context.Context, assetIDs []string) error {
 	return c.addAndSend(ctx, newMarketSubscription(channelTypeMarketRes, assetIDs, false, true))
+}
+
+// UnsubscribeMarketResolutions unsubscribes from market resolution events for the given asset IDs.
+func (c *Client) UnsubscribeMarketResolutions(ctx context.Context, assetIDs []string) error {
+	return c.removeAndSend(ctx, channelTypeMarketRes, assetIDs)
 }
 
 // SubscribeUserEvents subscribes to all user events (orders and trades) for the given markets.
