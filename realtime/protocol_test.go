@@ -77,6 +77,8 @@ func TestRequestValidationBeforeNetworkAllocation(t *testing.T) {
 		{Channel: Equity, Symbols: []string{"a$pl"}},
 		{Channel: Equity, Symbols: []string{strings.Repeat("a", 65)}},
 		{Channel: Crypto, Symbols: []string{"btcusd"}, Provider: "massive"},
+		{Channel: CryptoTWAP, Symbols: []string{"btcusd"}, Provider: Binance},
+		{Channel: Equity, Symbols: []string{"aapl"}, Provider: Binance},
 		{Channel: Crypto, Symbols: []string{"btcusd"}, Types: []EventType{Accepted}},
 	} {
 		if _, err := c.Subscribe(t.Context(), request); err == nil {
@@ -88,6 +90,26 @@ func TestRequestValidationBeforeNetworkAllocation(t *testing.T) {
 	defer f.mu.Unlock()
 	if len(f.observations) != 0 {
 		t.Fatal("invalid request opened a connection")
+	}
+}
+
+// TestBinanceProvider pins the documented spot-provider filter. Binance is
+// only valid on price.crypto; the TWAP and equity channels must reject it.
+func TestBinanceProvider(t *testing.T) {
+	keys, err := requestKeys(Request{
+		Channel:  Crypto,
+		Symbols:  []string{"btcusd"},
+		Provider: Binance,
+	})
+	if err != nil {
+		t.Fatalf("requestKeys: %v", err)
+	}
+	if len(keys) != 1 || keys[0].provider != Binance {
+		t.Fatalf("keys = %+v, want one binance key", keys)
+	}
+	wire := keys[0].wire()
+	if wire.Channel != Crypto || wire.Filter.Symbol != "btcusd" || wire.Filter.Provider != Binance || wire.Filter.WindowSeconds != 0 {
+		t.Fatalf("wire = %+v, want price.crypto btcusd provider binance", wire)
 	}
 }
 

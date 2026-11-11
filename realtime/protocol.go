@@ -26,8 +26,11 @@ func requestKeys(r Request) ([]priceKey, error) {
 	if !r.Channel.valid() {
 		return nil, fmt.Errorf("realtime: invalid channel %q", r.Channel)
 	}
-	if r.Provider != "" && r.Provider != Chainlink && r.Provider != Pyth {
+	if r.Provider != "" && r.Provider != Chainlink && r.Provider != Pyth && r.Provider != Binance {
 		return nil, fmt.Errorf("realtime: invalid provider %q", r.Provider)
+	}
+	if r.Provider == Binance && r.Channel != Crypto {
+		return nil, fmt.Errorf("realtime: provider %q is only valid on %s", r.Provider, Crypto)
 	}
 	if len(r.Symbols) == 0 {
 		return nil, fmt.Errorf("realtime: symbols are required")

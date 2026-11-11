@@ -32,6 +32,9 @@ type Provider string
 const (
 	Chainlink Provider = "chainlink"
 	Pyth      Provider = "pyth"
+	// Binance pins the spot provider on price.crypto. It is not valid on the
+	// TWAP or equity channels.
+	Binance Provider = "binance"
 )
 
 // Source is actual event provenance, not a requested provider. Unknown values
