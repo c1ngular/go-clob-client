@@ -367,3 +367,61 @@ func TestWarmOrderMetadataPopulatesCacheWithoutRefetch(t *testing.T) {
 		t.Fatal("blank position id accepted")
 	}
 }
+
+func TestWarmOrderMetadataRemovesMetadataFromFirstOrder(t *testing.T) {
+	var conditionCalls, marketCalls, tickCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case versionEndpoint:
+			_, _ = w.Write([]byte(`{"version":2}`))
+		case marketsByTokenEndpoint + "100":
+			conditionCalls.Add(1)
+			_, _ = w.Write([]byte(`{"condition_id":"cid","primary_token_id":"100","secondary_token_id":"200"}`))
+		case clobMarketEndpoint + "/cid":
+			marketCalls.Add(1)
+			_, _ = w.Write([]byte(`{"c":"cid","mts":"0.01","nr":false,"fd":{"r":"0.02","e":1},"t":[{"t":"100"},{"t":"200"}]}`))
+		case tickSizeEndpoint:
+			tickCalls.Add(1)
+			_, _ = w.Write([]byte(`{"minimum_tick_size":"0.01"}`))
+		case negRiskEndpoint:
+			_, _ = w.Write([]byte(`{"neg_risk":false}`))
+		case orderBookEndpoint:
+			_, _ = w.Write([]byte(`{"market":"m","asset_id":"100","timestamp":"1","bids":[],"asks":[],"min_order_size":"1","tick_size":"0.01","neg_risk":false,"last_trade_price":"0.45","hash":"h"}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewSignerClient(Config{
+		Host:       server.URL,
+		PrivateKey: "0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae1a40cf83f4a2f9c",
+		ChainID:    PolygonChainID,
+		RetryMax:   0,
+	})
+	if err != nil {
+		t.Fatalf("NewSignerClient: %v", err)
+	}
+	client.saltGenerator = func() (uint64, error) { return 42, nil }
+
+	if err := client.WarmOrderMetadata(t.Context(), "100"); err != nil {
+		t.Fatalf("WarmOrderMetadata: %v", err)
+	}
+	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 {
+		t.Fatalf("warm calls: condition=%d market=%d, want 1/1", conditionCalls.Load(), marketCalls.Load())
+	}
+
+	if _, err := client.CreateOrder(t.Context(), OrderArgs{
+		PositionID: "100",
+		Price:      udecimal.MustParse("0.45"),
+		Size:       udecimal.MustParse("10"),
+		Side:       SideBuy,
+	}, nil); err != nil {
+		t.Fatalf("CreateOrder after warm: %v", err)
+	}
+	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 || tickCalls.Load() != 0 {
+		t.Fatalf("first order metadata calls: condition=%d market=%d tick=%d, want 1/1/0",
+			conditionCalls.Load(), marketCalls.Load(), tickCalls.Load())
+	}
+}
