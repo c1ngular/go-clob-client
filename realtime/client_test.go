@@ -311,6 +311,41 @@ func TestWireChannelsAndProviders(t *testing.T) {
 	}
 }
 
+// TestCryptoBinanceProvider exercises the full subscribe path for the
+// documented Binance spot pin: the filter carries provider=binance and the
+// acceptance reports the same provider.
+func TestCryptoBinanceProvider(t *testing.T) {
+	f := startFeed(t, func(p *testPeer, frame serverFrame) {
+		p.acknowledge(t, frame, "binance")
+		if frame.Op == "subscribe" {
+			p.write(t, priceFixture("price.crypto", "btcusd", true))
+		}
+	})
+	c := testClient(t, testConfig(f))
+	s := subscribe(t, c, t.Context(), Request{
+		Channel:  Crypto,
+		Symbols:  []string{"btcusd"},
+		Provider: Binance,
+	})
+	_ = f.next(t, "auth")
+	wire := f.next(t, "subscribe")
+	if len(wire.frame.Subscriptions) != 1 ||
+		wire.frame.Subscriptions[0].Channel != string(Crypto) ||
+		!reflect.DeepEqual(wire.frame.Subscriptions[0].Filter, map[string]any{
+			"symbol":   "btcusd",
+			"provider": "binance",
+		}) {
+		t.Fatalf("wire = %#v, want price.crypto btcusd provider binance", wire.frame)
+	}
+	confirm := receive(t, s.Events())
+	if confirm.Type != Accepted || confirm.Confirmation.Provider == nil ||
+		*confirm.Confirmation.Provider != SourceBinance {
+		t.Fatalf("confirmation = %+v, want source binance", confirm)
+	}
+	s.Close()
+	waitClosed(t, s.Done())
+}
+
 func TestConcurrentSharingAndReferenceCounts(t *testing.T) {
 	f := startFeed(t, func(p *testPeer, frame serverFrame) {
 		p.acknowledge(t, frame, "")

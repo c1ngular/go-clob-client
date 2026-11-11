@@ -33,7 +33,8 @@ const (
 	Chainlink Provider = "chainlink"
 	Pyth      Provider = "pyth"
 	// Binance pins the spot provider on price.crypto. It is not valid on the
-	// TWAP or equity channels.
+	// TWAP or equity channels. The migration mapping and the live server use
+	// this value; the provider paragraph in the Live Data reference is stale.
 	Binance Provider = "binance"
 )
 
@@ -45,6 +46,7 @@ const (
 	SourceChainlink Source = "chainlink"
 	SourcePyth      Source = "pyth"
 	SourceMassive   Source = "massive"
+	SourceBinance   Source = "binance"
 )
 
 // MarketStatus is the state of the market of the instrument an equity provider
