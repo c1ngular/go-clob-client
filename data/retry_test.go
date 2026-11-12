@@ -216,7 +216,7 @@ func TestReadRetryCancellation(t *testing.T) {
 	}
 }
 
-func TestReadErrorsAndAccountingAreNotRetried(t *testing.T) {
+func TestReadErrorsAreNotRetried(t *testing.T) {
 	for _, reply := range []string{`invalid json`, `{"data":{}}`, `{"data":null}`} {
 		t.Run(reply, func(t *testing.T) {
 			var calls atomic.Int32
@@ -247,20 +247,4 @@ func TestReadErrorsAndAccountingAreNotRetried(t *testing.T) {
 			t.Fatalf("calls=%d error=%v", calls, err)
 		}
 	})
-	var calls atomic.Int32
-	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.Header().Set("Retry-After", "0")
-		w.WriteHeader(http.StatusTooManyRequests)
-	})
-	var dst strings.Builder
-	err := client.WriteAccountingSnapshot(t.Context(), "wallet", &dst)
-	var apiErr *APIError
-	if !errors.As(err, &apiErr) || apiErr.StatusCode != 429 || calls.Load() != 1 || dst.Len() != 0 {
-		t.Fatalf(
-			"accounting download retried or wrote an error: calls=%d error=%v",
-			calls.Load(),
-			err,
-		)
-	}
 }

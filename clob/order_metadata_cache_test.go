@@ -35,7 +35,7 @@ func TestOrderMetadataCacheWarmsSiblingTokensAndDeduplicatesLoads(t *testing.T) 
 			}
 			_, _ = w.Write(
 				[]byte(
-					`{"c":"cid","mts":"0.01","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"yes"},{"t":"no"}]}`,
+					`{"v":"v1","c":"cid","mts":"0.01","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"yes"},{"t":"no"}]}`,
 				),
 			)
 		default:
@@ -103,6 +103,7 @@ func TestOrderMetadataCacheRefreshesMarketWithoutResolvingCondition(t *testing.T
 				tickSize = TickSizeThousandth
 			}
 			data, _ := json.Marshal(ClobMarketInfoResponse{
+				Version:     MarketVersionV1,
 				ConditionID: "cid",
 				MinTickSize: string(tickSize),
 				Tokens:      []*ClobMarketToken{{TokenID: "yes"}},
@@ -289,7 +290,9 @@ func TestCreateOrderRefreshesStaleTickMetadata(t *testing.T) {
 		case marketsByTokenEndpoint + "100":
 			_, _ = w.Write([]byte(`{"condition_id":"cid"}`))
 		case clobMarketEndpoint + "/cid":
-			_, _ = w.Write([]byte(`{"c":"cid","mts":"0.001","nr":false,"t":[{"t":"100"}]}`))
+			_, _ = w.Write(
+				[]byte(`{"v":"v1","c":"cid","mts":"0.001","nr":false,"t":[{"t":"100"}]}`),
+			)
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -333,7 +336,11 @@ func TestWarmOrderMetadataPopulatesCacheWithoutRefetch(t *testing.T) {
 			_, _ = w.Write([]byte(`{"condition_id":"cid"}`))
 		case clobMarketEndpoint + "/cid":
 			marketCalls.Add(1)
-			_, _ = w.Write([]byte(`{"c":"cid","mts":"0.01","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"yes"},{"t":"no"}]}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"v":"v1","c":"cid","mts":"0.01","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"yes"},{"t":"no"}]}`,
+				),
+			)
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -349,7 +356,11 @@ func TestWarmOrderMetadataPopulatesCacheWithoutRefetch(t *testing.T) {
 		t.Fatalf("WarmOrderMetadata: %v", err)
 	}
 	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 {
-		t.Fatalf("warm calls: condition=%d market=%d, want 1/1", conditionCalls.Load(), marketCalls.Load())
+		t.Fatalf(
+			"warm calls: condition=%d market=%d, want 1/1",
+			conditionCalls.Load(),
+			marketCalls.Load(),
+		)
 	}
 
 	value, err := client.resolveOrderMarketMetadata(t.Context(), "yes", false)
@@ -360,7 +371,11 @@ func TestWarmOrderMetadataPopulatesCacheWithoutRefetch(t *testing.T) {
 		t.Fatalf("metadata = %+v", value)
 	}
 	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 {
-		t.Fatalf("cache hit refetched: condition=%d market=%d", conditionCalls.Load(), marketCalls.Load())
+		t.Fatalf(
+			"cache hit refetched: condition=%d market=%d",
+			conditionCalls.Load(),
+			marketCalls.Load(),
+		)
 	}
 
 	if err := client.WarmOrderMetadata(t.Context(), " "); err == nil {
@@ -377,17 +392,29 @@ func TestWarmOrderMetadataRemovesMetadataFromFirstOrder(t *testing.T) {
 			_, _ = w.Write([]byte(`{"version":2}`))
 		case marketsByTokenEndpoint + "100":
 			conditionCalls.Add(1)
-			_, _ = w.Write([]byte(`{"condition_id":"cid","primary_token_id":"100","secondary_token_id":"200"}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"condition_id":"cid","primary_token_id":"100","secondary_token_id":"200"}`,
+				),
+			)
 		case clobMarketEndpoint + "/cid":
 			marketCalls.Add(1)
-			_, _ = w.Write([]byte(`{"c":"cid","mts":"0.01","nr":false,"fd":{"r":"0.02","e":1},"t":[{"t":"100"},{"t":"200"}]}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"v":"v2","c":"cid","mts":"0.01","nr":false,"fd":{"r":"0.02","e":1},"t":[{"t":"100"},{"t":"200"}]}`,
+				),
+			)
 		case tickSizeEndpoint:
 			tickCalls.Add(1)
 			_, _ = w.Write([]byte(`{"minimum_tick_size":"0.01"}`))
 		case negRiskEndpoint:
 			_, _ = w.Write([]byte(`{"neg_risk":false}`))
 		case orderBookEndpoint:
-			_, _ = w.Write([]byte(`{"market":"m","asset_id":"100","timestamp":"1","bids":[],"asks":[],"min_order_size":"1","tick_size":"0.01","neg_risk":false,"last_trade_price":"0.45","hash":"h"}`))
+			_, _ = w.Write(
+				[]byte(
+					`{"market":"m","asset_id":"100","timestamp":"1","bids":[],"asks":[],"min_order_size":"1","tick_size":"0.01","neg_risk":false,"last_trade_price":"0.45","hash":"h"}`,
+				),
+			)
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -409,7 +436,11 @@ func TestWarmOrderMetadataRemovesMetadataFromFirstOrder(t *testing.T) {
 		t.Fatalf("WarmOrderMetadata: %v", err)
 	}
 	if conditionCalls.Load() != 1 || marketCalls.Load() != 1 {
-		t.Fatalf("warm calls: condition=%d market=%d, want 1/1", conditionCalls.Load(), marketCalls.Load())
+		t.Fatalf(
+			"warm calls: condition=%d market=%d, want 1/1",
+			conditionCalls.Load(),
+			marketCalls.Load(),
+		)
 	}
 
 	if _, err := client.CreateOrder(t.Context(), OrderArgs{

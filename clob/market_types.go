@@ -8,8 +8,22 @@ import (
 	"github.com/quagmt/udecimal"
 )
 
+// MarketVersion is the protocol version a CLOB market trades under.
+// Known values are v1 (CTF outcome tokens) and v2 (native position IDs).
+type MarketVersion string
+
+const (
+	// MarketVersionV1 is the CTF-token market protocol.
+	MarketVersionV1 MarketVersion = "v1"
+	// MarketVersionV2 is the native position market protocol.
+	MarketVersionV2 MarketVersion = "v2"
+)
+
 // Market is the typed response for a full market record.
 type Market struct {
+	// Version is the protocol version reported by the venue. Empty means the
+	// server did not report one.
+	Version              MarketVersion  `json:"version"`
 	EnableOrderBook      bool           `json:"enable_order_book"`
 	Active               bool           `json:"active"`
 	Closed               bool           `json:"closed"`
@@ -236,6 +250,9 @@ type FeeDetails struct {
 
 // ClobMarketInfoResponse is the wire format for /clob-markets/{condition_id}.
 type ClobMarketInfoResponse struct {
+	// Version is the compact venue protocol marker. Empty means the server did
+	// not report one.
+	Version      MarketVersion      `json:"v"`
 	ConditionID  string             `json:"c"`
 	MinTickSize  string             `json:"mts"`
 	MinOrderSize string             `json:"mos"`

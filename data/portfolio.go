@@ -2,11 +2,7 @@ package data
 
 import (
 	"context"
-	"io"
-	"net/http"
 	"net/url"
-
-	"github.com/nijaru/go-clob-client/internal/polyhttp"
 )
 
 func (c *Client) GetValue(ctx context.Context, p ValueParams) (*PortfolioValue, error) {
@@ -61,29 +57,4 @@ func (c *Client) GetApprovals(ctx context.Context, user string) (*ApprovalsSnaps
 		return nil, err
 	}
 	return getValue[ApprovalsSnapshot](ctx, c, "/v2/approvals", q, false)
-}
-
-// WriteAccountingSnapshot streams the accounting ZIP archive into dst. The
-// caller owns dst and any partially written output after an error. The SDK
-// closes the HTTP response on every exit and does not buffer the whole archive.
-// This download retains its /v1 path in the current unified SDK contract.
-func (c *Client) WriteAccountingSnapshot(ctx context.Context, user string, dst io.Writer) error {
-	if dst == nil {
-		return input("destination", "writer is required")
-	}
-	q := url.Values{}
-	if err := requireUser(q, user); err != nil {
-		return err
-	}
-	return c.http.DoJSON(
-		ctx,
-		http.MethodGet,
-		"/v1/accounting/snapshot",
-		q,
-		nil,
-		polyhttp.AuthNone,
-		nil,
-		map[string]string{"Accept": "application/zip"},
-		dst,
-	)
 }

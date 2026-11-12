@@ -14,6 +14,10 @@ func TestLegacyOrderSigningAndWireContract(t *testing.T) {
 		switch r.URL.Path {
 		case versionEndpoint:
 			_, _ = w.Write([]byte(`{"version":1}`))
+		case marketsByTokenEndpoint + "123":
+			_, _ = w.Write([]byte(`{"condition_id":"cid"}`))
+		case clobMarketEndpoint + "/cid":
+			_, _ = w.Write([]byte(`{"v":"v1","c":"cid","mts":"0.01","nr":false,"t":[{"t":"123"}]}`))
 		case feeRateEndpoint:
 			if r.URL.Query().Get("token_id") != "123" {
 				t.Error("wrong fee asset")

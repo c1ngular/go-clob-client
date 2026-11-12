@@ -25,7 +25,7 @@ func TestPositionOrdersResolveMarketTickBookAndFees(t *testing.T) {
 			markets.Add(1)
 			_, _ = w.Write(
 				[]byte(
-					`{"c":"cid","mts":"0.001","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"999"}]}`,
+					`{"v":"v2","c":"cid","mts":"0.001","nr":true,"fd":{"r":"0.02","e":1},"t":[{"t":"999"}]}`,
 				),
 			)
 		case tickSizeEndpoint:
@@ -135,11 +135,11 @@ func TestPositionOrdersResolveMarketTickBookAndFees(t *testing.T) {
 func TestPositionPriceGuardRefreshesMarketWithoutRelaxation(t *testing.T) {
 	t.Parallel()
 	client := protectedMarketTestClient(t, TickSizeThousandth)
-	client.SetTickSize("100", TickSizeHundredth)
+	client.SetTickSize("200", TickSizeHundredth)
 	bound := MustDec("0.543")
 	order, err := client.CreateMarketOrder(
 		t.Context(),
-		MarketOrderArgs{PositionID: "100", Amount: MustDec("100"), Side: SideBuy, MaxPrice: &bound},
+		MarketOrderArgs{PositionID: "200", Amount: MustDec("100"), Side: SideBuy, MaxPrice: &bound},
 		nil,
 	)
 	if err != nil {

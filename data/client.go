@@ -27,7 +27,7 @@ type Config struct {
 // the configured HTTP transport is. It performs no signing or trading writes.
 // Indexed JSON reads retry HTTP 429 twice, honoring server retry delays (one second
 // when absent). Delays over five seconds propagate without retrying; the caller's
-// context bounds requests and waits. Accounting downloads are not retried.
+// context bounds requests and waits.
 type Client struct{ http *polyhttp.Client }
 
 func NewClient(config Config) (*Client, error) {

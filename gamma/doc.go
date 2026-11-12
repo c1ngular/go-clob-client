@@ -35,7 +35,9 @@
 // Market outcomes, prices, CLOB token IDs and V2 position IDs accept direct or
 // JSON-encoded arrays and retain their wire order, including legacy multi-outcome
 // markets. OutcomeDetails pairs them by index without substituting token IDs for
-// native positions. Unknown protocol and combo status values pass through unchanged.
+// native positions; TradingID selects the identifier the venue expects for an
+// outcome by the market's protocol version. Unknown protocol and combo status
+// values pass through unchanged.
 // GetPublicProfile returns nil for a JSON null response.
 //
 // # Scope and limitations

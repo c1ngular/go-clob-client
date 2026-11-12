@@ -431,8 +431,9 @@ func (t *Trade) UnmarshalJSON(data []byte) error {
 // OrderArgs contains the inputs for building a limit order.
 //
 // Provide exactly one of TokenID or PositionID. TokenID identifies a CTF token
-// outcome and routes the order through the V2 exchange; PositionID identifies a
-// Polymarket V2 position-backed outcome and routes it through Exchange V3.
+// outcome in a v1 market; PositionID identifies a native position in a v2
+// market. CreateOrder rejects the field that disagrees with the market version
+// reported by the venue.
 type OrderArgs struct {
 	TokenID    string
 	PositionID string
@@ -456,12 +457,13 @@ type OrderArgs struct {
 // MarketOrderArgs contains the inputs for building a market order.
 //
 // Provide exactly one of TokenID or PositionID. TokenID identifies a CTF token
-// outcome and routes the order through the V2 exchange; PositionID identifies a
-// Polymarket V2 position-backed outcome and routes it through Exchange V3.
+// outcome in a v1 market; PositionID identifies a native position in a v2
+// market. CreateMarketOrder rejects the field that disagrees with the market
+// version reported by the venue.
 type MarketOrderArgs struct {
 	TokenID string
-	// PositionID identifies a Polymarket V2 position-backed outcome. When set,
-	// the order routes through Exchange V3 and TokenID must be empty.
+	// PositionID identifies a native position in a v2 market. When set, the
+	// order routes through Exchange V3 and TokenID must be empty.
 	PositionID string
 	// Amount is the quantity to trade:
 	//   BUY:  Amount is the USDC notional to spend. Shares are derived from price.

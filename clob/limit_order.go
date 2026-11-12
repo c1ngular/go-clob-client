@@ -19,25 +19,28 @@ func (c *SignerClient) CreateOrder(
 
 	assetID := orderAssetID(userOrder.TokenID, userOrder.PositionID)
 
-	var metadata orderMarketMetadata
-	var err error
 	tickSizeOption := options != nil && options.TickSize != ""
 	negRiskOption := userOrder.PositionID != "" || (options != nil && options.NegRisk != nil)
 	marketTickSize, tickCached := c.cachedTickSize(assetID)
 	cachedNegRisk, negRiskCached := c.cachedNegRisk(assetID)
-	metadataLoaded := (!tickCached && !tickSizeOption) || (!negRiskCached && !negRiskOption)
-	if metadataLoaded {
-		metadata, err = c.resolveOrderMarketMetadata(ctx, assetID, false)
-		if err != nil {
-			return nil, err
-		}
-		if !tickCached {
-			marketTickSize = metadata.TickSize
-		}
-		if !negRiskCached {
-			cachedNegRisk = metadata.NegRisk
-			negRiskCached = true
-		}
+
+	// Order construction always resolves market metadata so the venue's
+	// protocol version can gate the identifier choice. Caller-supplied tick
+	// and neg-risk options only override the resolved fields; they do not
+	// bypass the V1/V2 ID check.
+	metadata, err := c.resolveOrderMarketMetadata(ctx, assetID, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOrderMarketIDs(metadata, userOrder.TokenID, userOrder.PositionID); err != nil {
+		return nil, err
+	}
+	if !tickCached {
+		marketTickSize = metadata.TickSize
+	}
+	if !negRiskCached {
+		cachedNegRisk = metadata.NegRisk
+		negRiskCached = true
 	}
 
 	var tickSize TickSize
@@ -60,18 +63,13 @@ func (c *SignerClient) CreateOrder(
 			)
 		}
 		tickSize = options.TickSize
-	} else if tickCached || metadataLoaded {
+	} else {
 		tickSize = marketTickSize
 		if tickSize == "" {
 			tickSize, err = c.resolveTickSize(ctx, assetID, nil)
 			if err != nil {
 				return nil, err
 			}
-		}
-	} else {
-		tickSize, err = c.resolveTickSize(ctx, assetID, options)
-		if err != nil {
-			return nil, err
 		}
 	}
 

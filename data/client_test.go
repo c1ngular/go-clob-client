@@ -1,11 +1,9 @@
 package data
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -229,30 +227,6 @@ func TestConditionGrammarAndRequestScope(t *testing.T) {
 	}
 }
 
-func TestAccountingArchiveStreaming(t *testing.T) {
-	archive := []byte{'P', 'K', 3, 4, 0, 255, 1}
-	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/accounting/snapshot" || r.Header.Get("Accept") != "application/zip" ||
-			r.URL.Query().Get("user") != "wallet" {
-			t.Errorf("wrong archive request: %s", r.URL)
-		}
-		w.Write(archive)
-	})
-	var dst bytes.Buffer
-	if err := client.WriteAccountingSnapshot(t.Context(), "wallet", &dst); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(dst.Bytes(), archive) {
-		t.Fatal("archive was JSON/base64 decoded or changed")
-	}
-	if err := client.WriteAccountingSnapshot(t.Context(), "wallet", errorWriter{}); !errors.Is(
-		err,
-		io.ErrClosedPipe,
-	) {
-		t.Fatalf("lost destination error: %v", err)
-	}
-}
-
 func tradeFixture(asset, size string) string {
 	return fmt.Sprintf(
 		`{"proxy_wallet":"0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b","token_id":%q,"condition_id":"0x7ad403c3508f8e3912940fd1a913f227591145ca0614074208e0b962d5fcc422","side":"BUY","size":%q,"price":"0.5","timestamp":1785425912,"transaction_hash":"0x1fc7a1df48dcac15859af515ebd77183c3487591181469a60dbf115b705f005a"}`,
@@ -260,7 +234,3 @@ func tradeFixture(asset, size string) string {
 		size,
 	)
 }
-
-type errorWriter struct{}
-
-func (errorWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }

@@ -24,7 +24,11 @@ type OrderAmountsArgs struct {
 	BuilderCode string
 }
 
-// CreateExchangeV3OrderFromAmounts signs exact uint256 base-unit amounts.
+// CreateExchangeV3OrderFromAmounts signs exact uint256 base-unit amounts
+// against Exchange V3. It is the explicit low-level path: it reads no market
+// metadata, so the caller is responsible for using a v2 position ID (or a
+// token ID the venue accepts under V3) and for the economic meaning of the
+// amounts.
 func (c *SignerClient) CreateExchangeV3OrderFromAmounts(
 	ctx context.Context,
 	args OrderAmountsArgs,

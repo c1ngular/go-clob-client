@@ -13,6 +13,16 @@
 //     (posting orders, managing positions, heartbeats). Requires a signer and
 //     CLOB API credentials. Relayer and builder authentication are separate.
 //
+// # Protocol versions
+//
+// Order construction reads the market's reported version. v1 markets require
+// [OrderArgs.TokenID]/[MarketOrderArgs.TokenID] and sign against the CTF
+// exchange; v2 markets require [OrderArgs.PositionID]/
+// [MarketOrderArgs.PositionID] and sign against Exchange V3. CreateOrder and
+// CreateMarketOrder reject a mismatched identifier, an absent version, or an
+// unknown version rather than guessing the exchange. Use
+// gamma.Market.TradingID to select the identifier for an outcome.
+//
 // # Creating a client
 //
 //	// Read-only

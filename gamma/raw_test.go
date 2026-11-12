@@ -10,7 +10,9 @@ import (
 // keeps the venue's exact object, including fields the model does not know,
 // and marshaling the model does not leak that raw copy back onto the wire.
 func TestMarketCapturesRawPayload(t *testing.T) {
-	raw := []byte(`{"id":"42","slug":"btc-updown-5m-1","version":"v2","outcomes":"[\"Up\",\"Down\"]","positionIds":["1","2"],"unknownField":{"keep":true}}`)
+	raw := []byte(
+		`{"id":"42","slug":"btc-updown-5m-1","version":"v2","outcomes":"[\"Up\",\"Down\"]","positionIds":["1","2"],"unknownField":{"keep":true}}`,
+	)
 	var market Market
 	if err := json.Unmarshal(raw, &market); err != nil {
 		t.Fatalf("unmarshal: %v", err)

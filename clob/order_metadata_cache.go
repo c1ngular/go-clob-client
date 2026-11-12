@@ -19,6 +19,7 @@ func (c *Client) orderMetadataTTL() time.Duration {
 
 type orderMarketMetadata struct {
 	ConditionID string
+	Version     MarketVersion
 	TickSize    TickSize
 	NegRisk     bool
 	FeeInfo     FeeInfo
@@ -274,6 +275,7 @@ func (c *Client) fetchOrderMarketMetadata(
 	}
 	return orderMarketMetadata{
 		ConditionID: conditionID,
+		Version:     market.Version,
 		TickSize:    TickSize(market.MinTickSize),
 		NegRisk:     market.NegRisk,
 		FeeInfo:     feeInfo,
@@ -299,6 +301,42 @@ func validateOrderMarketToken(
 		}
 	}
 	return value, nil
+}
+
+// validateOrderMarketIDs checks that the identifier field agrees with the
+// protocol version the venue reports. The V2 migration requires choosing the
+// ID field by version: position IDs for v2 markets and CTF token IDs for v1
+// markets. Rejecting a mismatch prevents signing against the wrong exchange
+// domain; an absent or unknown version is refused rather than guessed.
+func validateOrderMarketIDs(value orderMarketMetadata, tokenID, positionID string) error {
+	switch value.Version {
+	case MarketVersionV1:
+		if positionID != "" {
+			return fmt.Errorf(
+				"market %s is v1; use TokenID for a CTF outcome, not PositionID",
+				value.ConditionID,
+			)
+		}
+	case MarketVersionV2:
+		if tokenID != "" {
+			return fmt.Errorf(
+				"market %s is v2; use PositionID for a native position, not TokenID",
+				value.ConditionID,
+			)
+		}
+	case "":
+		return fmt.Errorf(
+			"market %s did not report a protocol version; refusing to sign",
+			value.ConditionID,
+		)
+	default:
+		return fmt.Errorf(
+			"market %s reports unsupported protocol version %q; refusing to sign",
+			value.ConditionID,
+			value.Version,
+		)
+	}
+	return nil
 }
 
 func feeInfoFromMarket(market ClobMarketInfoResponse) (FeeInfo, error) {

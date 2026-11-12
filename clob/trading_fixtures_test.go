@@ -76,6 +76,18 @@ func newTradingFixtureServer(t *testing.T) *httptest.Server {
 		switch r.URL.Path {
 		case versionEndpoint:
 			_, _ = w.Write([]byte(`{"version":2}`))
+		case marketsByTokenEndpoint + "123":
+			_, _ = w.Write([]byte(`{"condition_id":"cid-v1"}`))
+		case marketsByTokenEndpoint + "999":
+			_, _ = w.Write([]byte(`{"condition_id":"cid-v2"}`))
+		case clobMarketEndpoint + "/cid-v1":
+			_, _ = w.Write(
+				[]byte(`{"v":"v1","c":"cid-v1","mts":"0.001","nr":false,"t":[{"t":"123"}]}`),
+			)
+		case clobMarketEndpoint + "/cid-v2":
+			_, _ = w.Write(
+				[]byte(`{"v":"v2","c":"cid-v2","mts":"0.001","nr":false,"t":[{"t":"999"}]}`),
+			)
 		case tickSizeEndpoint:
 			_, _ = w.Write([]byte(`{"minimum_tick_size":"0.001"}`))
 		case negRiskEndpoint:
@@ -510,6 +522,12 @@ func newVersionedTradingFixtureServer(t *testing.T, version uint32) *httptest.Se
 		switch r.URL.Path {
 		case versionEndpoint:
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"version":%d}`, version)))
+		case marketsByTokenEndpoint + "123":
+			_, _ = w.Write([]byte(`{"condition_id":"cid-v1"}`))
+		case clobMarketEndpoint + "/cid-v1":
+			_, _ = w.Write(
+				[]byte(`{"v":"v1","c":"cid-v1","mts":"0.001","nr":false,"t":[{"t":"123"}]}`),
+			)
 		case tickSizeEndpoint:
 			_, _ = w.Write([]byte(`{"minimum_tick_size":"0.001"}`))
 		case negRiskEndpoint:
@@ -546,6 +564,12 @@ func newVersionFlippingTradingServer(
 		switch r.URL.Path {
 		case versionEndpoint:
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"version":%d}`, version.Load())))
+		case marketsByTokenEndpoint + "123":
+			_, _ = w.Write([]byte(`{"condition_id":"cid-v1"}`))
+		case clobMarketEndpoint + "/cid-v1":
+			_, _ = w.Write(
+				[]byte(`{"v":"v1","c":"cid-v1","mts":"0.001","nr":false,"t":[{"t":"123"}]}`),
+			)
 		case tickSizeEndpoint:
 			_, _ = w.Write([]byte(`{"minimum_tick_size":"0.001"}`))
 		case negRiskEndpoint:

@@ -40,7 +40,7 @@ func TestCreateProtectedMarketOrder(t *testing.T) {
 			client := protectedMarketTestClient(t, tc.tick)
 			args := MarketOrderArgs{TokenID: "100", Amount: MustDec(tc.amount), Side: tc.side}
 			if tc.position {
-				args.TokenID, args.PositionID = "", "100"
+				args.TokenID, args.PositionID = "", "200"
 			}
 			if tc.explicit != "" {
 				args.Price = MustDec(tc.explicit)
@@ -237,11 +237,19 @@ func protectedMarketTestClient(t *testing.T, tick TickSize) *SignerClient {
 		case negRiskEndpoint:
 			_, _ = w.Write([]byte(`{"neg_risk":false}`))
 		case marketsByTokenEndpoint + "100":
-			_, _ = w.Write([]byte(`{"condition_id":"cid"}`))
-		case clobMarketEndpoint + "/cid":
+			_, _ = w.Write([]byte(`{"condition_id":"cid-v1"}`))
+		case marketsByTokenEndpoint + "200":
+			_, _ = w.Write([]byte(`{"condition_id":"cid-v2"}`))
+		case clobMarketEndpoint + "/cid-v1":
 			_, _ = fmt.Fprintf(
 				w,
-				`{"c":"cid","mts":%q,"nr":false,"fd":{"r":"0","e":0},"t":[{"t":"100"}]}`,
+				`{"v":"v1","c":"cid-v1","mts":%q,"nr":false,"fd":{"r":"0","e":0},"t":[{"t":"100"}]}`,
+				tick,
+			)
+		case clobMarketEndpoint + "/cid-v2":
+			_, _ = fmt.Fprintf(
+				w,
+				`{"v":"v2","c":"cid-v2","mts":%q,"nr":false,"fd":{"r":"0","e":0},"t":[{"t":"200"}]}`,
 				tick,
 			)
 		default:

@@ -117,10 +117,12 @@ func TestAPIErrorRetryableClassification(t *testing.T) {
 		{"malformed", `{"error":"unavailable","retryable":"yes"}`, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(tc.body))
-			}))
+			server := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(tc.body))
+				}),
+			)
 			defer server.Close()
 
 			client := &Client{BaseURL: server.URL, HTTPClient: server.Client(), UserAgent: "test"}

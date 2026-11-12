@@ -632,6 +632,7 @@ func newTradingTestServerWithTickSize(
 			)
 		case clobMarketEndpoint + "/cid":
 			data, _ := json.Marshal(ClobMarketInfoResponse{
+				Version:     MarketVersionV1,
 				ConditionID: "cid",
 				MinTickSize: string(tickSize),
 				NegRisk:     false,

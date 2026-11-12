@@ -60,7 +60,11 @@ func TestGetStatus(t *testing.T) {
 
 func TestGetStatusNullLag(t *testing.T) {
 	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"computed_at":"2026-11-12T04:30:00Z","age_seconds":1,"serving":{"lag_seconds":null,"mechanisms":[]},"ingestion":{"cursors":0,"chain_id":137,"lagging":[]}}}`))
+		_, _ = w.Write(
+			[]byte(
+				`{"data":{"computed_at":"2026-11-12T04:30:00Z","age_seconds":1,"serving":{"lag_seconds":null,"mechanisms":[]},"ingestion":{"cursors":0,"chain_id":137,"lagging":[]}}}`,
+			),
+		)
 	})
 	status, err := client.GetStatus(t.Context())
 	if err != nil {

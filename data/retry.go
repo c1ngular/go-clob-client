@@ -10,10 +10,10 @@ import (
 	"github.com/nijaru/go-clob-client/internal/polyhttp"
 )
 
-// getReadJSON retries only the Data API's indexed JSON reads. Accounting
-// downloads and other services deliberately do not use this policy. A 429 is
-// retried here; a retryable 5xx is surfaced with APIError.Retryable and left to
-// the caller, because the retry budget belongs to the application workflow.
+// getReadJSON retries only the Data API's indexed JSON reads. Other services
+// deliberately do not use this policy. A 429 is retried here; a retryable 5xx
+// is surfaced with APIError.Retryable and left to the caller, because the retry
+// budget belongs to the application workflow.
 func (c *Client) getReadJSON(ctx context.Context, path string, q url.Values, out any) error {
 	for attempt := 0; ; attempt++ {
 		if err := ctx.Err(); err != nil {

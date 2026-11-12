@@ -874,10 +874,22 @@ func TestMarketChannelUnsubscribesReleaseRefs(t *testing.T) {
 		sub           func(context.Context, []string) error
 		unsub         func(context.Context, []string) error
 	}{
-		{"last trade", "ltp", false, client.SubscribeLastTradePrice, client.UnsubscribeLastTradePrice},
+		{
+			"last trade",
+			"ltp",
+			false,
+			client.SubscribeLastTradePrice,
+			client.UnsubscribeLastTradePrice,
+		},
 		{"best bid ask", "bba", true, client.SubscribeBestBidAsk, client.UnsubscribeBestBidAsk},
 		{"new markets", "new", true, client.SubscribeNewMarkets, client.UnsubscribeNewMarkets},
-		{"resolutions", "res", true, client.SubscribeMarketResolutions, client.UnsubscribeMarketResolutions},
+		{
+			"resolutions",
+			"res",
+			true,
+			client.SubscribeMarketResolutions,
+			client.UnsubscribeMarketResolutions,
+		},
 	}
 	for _, s := range subscriptions {
 		if err := s.sub(t.Context(), []string{s.id}); err != nil {

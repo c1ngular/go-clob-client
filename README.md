@@ -67,7 +67,7 @@ Each API has its own client. Import only the packages you need.
 | [`clob`](https://pkg.go.dev/github.com/nijaru/go-clob-client/clob) | Order books, trading, accounts, rewards, rebates, RFQ and wallet operations |
 | [`gamma`](https://pkg.go.dev/github.com/nijaru/go-clob-client/gamma) | Market and event discovery, tags, comments and search |
 | [`data`](https://pkg.go.dev/github.com/nijaru/go-clob-client/data) | Portfolios, activity, token references, analytics and leaderboards |
-| [`data/legacy`](https://pkg.go.dev/github.com/nijaru/go-clob-client/data/legacy) | Data API v1; separate from the v2 client |
+| [`data/legacy`](https://pkg.go.dev/github.com/nijaru/go-clob-client/data/legacy) | Retired Data API v1; isolated from the v2 client |
 | [`bridge`](https://pkg.go.dev/github.com/nijaru/go-clob-client/bridge) | Supported assets, cross-chain quotes and transfer status |
 | [`perps`](perps/README.md) | Perpetuals markets, accounts, trading and collateral |
 | [`clob/ws`](https://pkg.go.dev/github.com/nijaru/go-clob-client/clob/ws) | CLOB market and account streams |
@@ -90,9 +90,9 @@ not both. See [API-key setup](examples/clob/auth_bootstrap/main.go) and
 [external signing](examples/clob/external_signer/main.go).
 
 The function below submits a limit order for a direct EOA wallet. Set the four
-`POLYMARKET_*` credentials in your environment and pass the outcome token ID.
-**Calling it places a real order.** The wallet must already have funds and the
-required approvals.
+`POLYMARKET_*` credentials in your environment and pass the v1 CTF outcome token
+ID (use `PositionID` for a v2 native position). **Calling it places a real
+order.** The wallet must already have funds and the required approvals.
 
 ```go
 import (
@@ -130,7 +130,9 @@ func placeLimitOrder(ctx context.Context, tokenID string) (*clob.PostOrderRespon
 
 For proxy, Safe or deposit wallets, configure `SignatureType` and `FunderAddress`
 for your account; don't use the EOA defaults. Orders take either `TokenID` for a
-CTF outcome or `PositionID` for a native V2 position, not both.
+v1 CTF outcome or `PositionID` for a v2 native position, not both. The SDK reads
+the market's reported version and rejects a mismatched field; use
+`gamma.Market.TradingID` to select the right identifier.
 
 For market orders, use `MaxPrice` to cap a BUY price or `MinPrice` to floor a SELL
 price. `Amount` is USDC notional for BUY and shares for SELL; `MaxSpend` caps BUY

@@ -203,7 +203,10 @@ func (c *Client) copyBase() *Client {
 	return &copy
 }
 
-// NewRTDSClient creates a new RTDS (Real-Time Data Stream) WebSocket client.
+// NewRTDSClient creates a legacy RTDS (Real-Time Data Stream) WebSocket client.
+// PolyBolt price subscriptions live in github.com/nijaru/go-clob-client/realtime;
+// RTDS remains available for the 30-second TWAP window, which has no PolyBolt
+// replacement, and for the activity topic.
 func (c *Client) NewRTDSClient() *rtds.Client {
 	return rtds.NewClient(c.rtdsHost, nil)
 }

@@ -108,7 +108,9 @@ func TestBinanceProvider(t *testing.T) {
 		t.Fatalf("keys = %+v, want one binance key", keys)
 	}
 	wire := keys[0].wire()
-	if wire.Channel != Crypto || wire.Filter.Symbol != "btcusd" || wire.Filter.Provider != Binance || wire.Filter.WindowSeconds != 0 {
+	if wire.Channel != Crypto || wire.Filter.Symbol != "btcusd" ||
+		wire.Filter.Provider != Binance ||
+		wire.Filter.WindowSeconds != 0 {
 		t.Fatalf("wire = %+v, want price.crypto btcusd provider binance", wire)
 	}
 }

@@ -40,6 +40,18 @@ func (c *SignerClient) CreateMarketOrder(
 
 	assetID := orderAssetID(userOrder.TokenID, userOrder.PositionID)
 
+	marketMetadata, err := c.resolveOrderMarketMetadata(ctx, assetID, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOrderMarketIDs(
+		marketMetadata,
+		userOrder.TokenID,
+		userOrder.PositionID,
+	); err != nil {
+		return nil, err
+	}
+
 	tickSize, err := c.resolveTickSize(ctx, assetID, options)
 	if err != nil {
 		return nil, err

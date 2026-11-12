@@ -300,6 +300,9 @@ func (c *Client) SubscribeChainlinkTWAP60Seconds(ctx context.Context) error {
 }
 
 // SubscribeComments subscribes to comment events.
+//
+// Deprecated: The live comments stream is retired without a replacement
+// streaming channel. Use the Gamma comments endpoints for persisted comments.
 func (c *Client) SubscribeComments(
 	ctx context.Context,
 	commentType CommentType,
@@ -529,6 +532,9 @@ func (c *Client) UnsubscribeChainlinkTWAP60Seconds(ctx context.Context) error {
 
 // UnsubscribeComments releases one comment interest with the given credentials.
 // As in SubscribeComments, nil uses the client's configured credentials.
+//
+// Deprecated: The live comments stream is retired without a replacement
+// streaming channel. Use the Gamma comments endpoints for persisted comments.
 func (c *Client) UnsubscribeComments(
 	ctx context.Context,
 	commentType CommentType,
